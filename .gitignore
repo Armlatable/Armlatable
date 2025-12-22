@@ -1,0 +1,12 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Arduino / Firmware builds
+firmware/pico_motor_driver/build/
+
+# macOS
+.DS_Store
