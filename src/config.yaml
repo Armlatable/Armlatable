@@ -1,0 +1,11 @@
+serial:
+  dxl_port: "/dev/tty.usbserial-FTAO9VZP"
+  pico_port: "/dev/tty.usbmodem11401"
+
+dynamixel:
+  id: 1
+  baud_rate: 57600
+  model: "XM540"
+
+control:
+  loop_rate_hz: 20
