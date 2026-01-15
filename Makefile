@@ -28,10 +28,15 @@ install: setup_venv
 	$(PIP) install --upgrade pip
 	$(PIP) install -r requirements.txt
 
-# メインプログラム実行
-run:
+# テスト実行 (自動制御)
+test:
 	@if [ ! -d "$(VENV_DIR)" ]; then echo "venvが見つかりません。'make install'を実行してください。"; exit 1; fi
-	$(PYTHON) src/main.py
+	$(PYTHON) src/main.py test
+
+# キーボード操作モード
+keyboard:
+	@if [ ! -d "$(VENV_DIR)" ]; then echo "venvが見つかりません。'make install'を実行してください。"; exit 1; fi
+	$(PYTHON) src/main.py keyboard
 
 # ファームウェア書き込み (Arduino CLI使用)
 flash:
