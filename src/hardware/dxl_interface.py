@@ -15,6 +15,7 @@ class DynamixelInterface:
         self.ADDR_PRESENT_VELOCITY       = 128
         self.ADDR_PRESENT_POSITION       = 132
         self.ADDR_OPERATING_MODE         = 11
+        self.ADDR_GOAL_CURRENT           = 102  # 電流制限 (トルク制限)
 
         self.portHandler = PortHandler(device_name)
         self.packetHandler = PacketHandler(protocol_version)
@@ -47,6 +48,16 @@ class DynamixelInterface:
 
     def set_position(self, dxl_id, position):
          self.packetHandler.write4ByteTxRx(self.portHandler, dxl_id, self.ADDR_GOAL_POSITION, int(position))
+
+    def set_current_limit(self, dxl_id, current_ma):
+        """
+        電流制限を設定する（トルク制限として機能）
+
+        Args:
+            dxl_id: Dynamixel ID
+            current_ma: 電流制限値 (mA). XM430の場合、最大は約2300mA
+        """
+        self.packetHandler.write2ByteTxRx(self.portHandler, dxl_id, self.ADDR_GOAL_CURRENT, int(current_ma))
 
     def get_present_position(self, dxl_id):
         dxl_present_position, dxl_comm_result, dxl_error = self.packetHandler.read4ByteTxRx(self.portHandler, dxl_id, self.ADDR_PRESENT_POSITION)

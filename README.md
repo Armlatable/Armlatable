@@ -50,19 +50,39 @@ ls /dev/tty.usb* /dev/tty.usbmodem*
 
 ## 4. 実行
 
-以下のコマンドでプログラムを開始する。
+### 4.1 デモ実行 (自動制御)
+
+以下のコマンドでテスト用の自動制御プログラムを開始する。
 
 ```bash
-make run
+make test
 ```
 
-### 動作内容 (デモ)
+#### 動作内容
 - **0〜5秒**:
     - DCモーター: PWM制御で徐々に加速・減速 (-255 〜 255)
     - Dynamixel: 位置制御 (Position Mode) で往復運動
 - **5〜10秒**:
     - DCモーター: 停止
     - Dynamixel: 速度制御 (Velocity Mode) で一定回転 (100 RPM)
+
+### 4.2 キーボード操作
+
+以下のコマンドでキーボード操作モードを開始する。
+
+```bash
+make keyboard
+```
+
+#### 操作方法
+| キー | 動作 |
+|------|------|
+| `w` / `s` | DCモーター PWM +/- 50 |
+| `x` | DCモーター 停止 |
+| `a` / `d` | Dynamixel Position/Velocity +/- 100 |
+| `m` | モード切替 (Position ↔ Velocity) |
+| `Space` | 全停止 |
+| `q` | 終了 |
 
 ## 5. その他
 
