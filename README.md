@@ -1,91 +1,45 @@
 # Armlatable
 
-## 構成
+アームテーブル制御システムのプロトタイプ集。
 
-- **PC**: 高度な制御・コーディネーション (Python)
-- **Raspberry Pi Pico**: リアルタイムDCモーター制御 (C++/Arduino)
-- **PC-Pico通信**: シリアル通信による指令・ステータス交換
+## プロトタイプ一覧
 
-## 1. ハードウェア準備
+| ディレクトリ | マイコン | 通信 | ステータス | 説明 |
+|-------------|---------|------|-----------|------|
+| [proto_r4_wifi](./proto_r4_wifi/) | Arduino R4 WiFi | **WiFi (Dongle)** | **🟢 最新** | ESP32ドングル制御 |
+| [proto_pico](./proto_pico/) | Raspberry Pi Pico | USB Serial | 旧Ver | 初期プロトタイプ |
 
-1. **電源供給**
-    - ブレッドボードの電源ラインに DC電源 (約 12V ~ 15V) を供給する。
+> [!TIP]
+> **新規開発は [proto_r4_wifi](./proto_r4_wifi/) をベースにしてください。**
 
-2. **PC接続**
-    - **Pico**: USBケーブルでPCに接続する。
-    - **U2D2 (Dynamixel)**: USBケーブルでPCに接続する。
+## システム構成 (proto_r4_wifi)
 
-## 2. ソフトウェア準備
-
-ターミナルで本ディレクトリ (`Armlatable`) に移動し、以下のコマンドを実行する。
-
-### ライブラリのインストール
-Pythonの依存ライブラリをインストールする（仮想環境 `venv` が作成される）。
-```bash
-make install
+```mermaid
+graph LR
+    PC["PC"] <-->|USB| Dongle["ESP32 Dongle"]
+    Dongle <-->|WiFi UDP| R4["Arduino R4 WiFi"]
+    R4 --> Motors["DYNAMIXEL & DC Motors"]
 ```
 
-### ファームウェアの書き込み (初回のみ)
-Raspberry Pi Pico にファームウェアを書き込む。
-Arduino IDEを使用するか、CLIがセットアップされている場合は以下を実行する。
-```bash
-make flash
-# または Arduino IDE で firmware/pico_motor_driver/pico_motor_driver.ino を書き込む
-```
+詳細は [proto_r4_wifi/docs/architecture.md](./proto_r4_wifi/docs/architecture.md) を参照。
 
-## 3. 設定確認
-
-`src/config.yaml` を開き、接続されているシリアルポートが正しいか確認・修正する。
-
-```yaml
-serial:
-  dxl_port: "/dev/tty.usbserial-XXXXXX" # U2D2のポート
-  pico_port: "/dev/tty.usbmodemXXXXXX"  # Picoのポート
-```
-
-ポート名の確認方法 (Mac):
-```bash
-ls /dev/tty.usb* /dev/tty.usbmodem*
-```
-
-## 4. 実行
-
-### 4.1 デモ実行 (自動制御)
-
-以下のコマンドでテスト用の自動制御プログラムを開始する。
+## クイックスタート
 
 ```bash
-make test
+# 最新版 (R4 WiFi) を使う場合
+cd proto_r4_wifi
+make help
+
+# 旧版 (Pico) を使う場合
+cd proto_pico
+make help
 ```
 
-#### 動作内容
-- **0〜5秒**:
-    - DCモーター: PWM制御で徐々に加速・減速 (-255 〜 255)
-    - Dynamixel: 位置制御 (Position Mode) で往復運動
-- **5〜10秒**:
-    - DCモーター: 停止
-    - Dynamixel: 速度制御 (Velocity Mode) で一定回転 (100 RPM)
+## 共通コンポーネント
 
-### 4.2 キーボード操作
-
-以下のコマンドでキーボード操作モードを開始する。
-
-```bash
-make keyboard
-```
-
-#### 操作方法
-| キー | 動作 |
-|------|------|
-| `w` / `s` | DCモーター PWM +/- 50 |
-| `x` | DCモーター 停止 |
-| `a` / `d` | Dynamixel Position/Velocity +/- 100 |
-| `m` | モード切替 (Position ↔ Velocity) |
-| `Space` | 全停止 |
-| `q` | 終了 |
-
-## 5. その他
-
-- **トラブルシューティング**
-    - **Error: Resource busy**: Arduino IDEのシリアルモニタ等を閉じること。
-    - **Permission denied**: USBデバイスのアクセス権限を確認すること。
+| コンポーネント | proto_r4_wifi | proto_pico |
+|---------------|---------------|------------|
+| PC 制御 | Python | Python |
+| DYNAMIXEL | Shield (RS-485) | U2D2 (USB) |
+| DC モーター | TB6612FNG | TB6612FNG |
+| 通信 | **WiFi (Dedicated)** | USB Serial |

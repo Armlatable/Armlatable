@@ -1,6 +1,6 @@
 serial:
   dxl_port: "/dev/tty.usbserial-FTAO9VZP"
-  pico_port: "/dev/tty.usbmodem14201"
+  pico_port: "/dev/tty.usbmodem11201"
 
 dynamixel:
   id: 1

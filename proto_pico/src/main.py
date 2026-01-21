@@ -77,7 +77,7 @@ def main():
 
     # --- 設定読み込み ---
     try:
-        config = AppConfig.load('src/config.yaml')
+        config = AppConfig.load('config.yaml')
         print(f"Loaded config: {config}")
     except Exception as e:
         print(f"Failed to load config: {e}")
