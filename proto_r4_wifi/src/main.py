@@ -129,6 +129,10 @@ def main():
     print("Connecting to Dongle...")
     try:
         r4 = R4Interface(config.serial.port, config.serial.baud_rate)
+        # 設定送信 (DYNAMIXEL ID等)
+        r4.send_config(config.dynamixel.ids)
+        print("Config sent to firmware.")
+
     except Exception as e:
         print(f"Connection error: {e}")
         return

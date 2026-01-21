@@ -5,6 +5,7 @@
 import serial
 import time
 import threading
+from typing import List
 
 
 class R4Interface:
@@ -22,6 +23,20 @@ class R4Interface:
 
         self.dc_pwm = [0, 0]
         self.dxl_positions = {}
+
+    def send_config(self, ids: List[int]):
+        """
+        構成情報を送信する
+        Args:
+            ids: DYNAMIXEL IDリスト
+        """
+        ids_str = ",".join(map(str, ids))
+        cmd = f"CONFIG:ids={ids_str}\n"
+        print(f"Sending config: {cmd.strip()}")
+        # 確実に届くように何度か送るか、少し待つ
+        for _ in range(3):
+            self._send(cmd)
+            time.sleep(0.1)
 
     def set_dc_motor(self, pwm1: int, pwm2: int):
         """

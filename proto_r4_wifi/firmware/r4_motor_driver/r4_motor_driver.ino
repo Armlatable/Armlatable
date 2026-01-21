@@ -1,7 +1,7 @@
 /**
  * @file r4_motor_driver.ino
  * @brief Arduino R4 WiFi モーター制御ファームウェア (UDP版)
- * @details ESP32 ドングル (AP) に接続し、UDP でコマンドを送受信する。
+ * @details ESP32 ドングル (AP) に接続し、UDP でコマンドを送受信する。CONFIG コマンドにより動的に設定可能。
  *
  * @par システム構成
  *   - PC <--USB--> ESP32 Dongle (AP)
@@ -28,8 +28,9 @@ WiFiUDP udp;
  * @name DYNAMIXEL設定
  **/
 DynamixelShield dxl;
-const uint8_t DXL_IDS[] = {1, 2, 3};
-const uint8_t DXL_COUNT = 3;
+const uint8_t MAX_DXL_COUNT = 8;
+uint8_t dxl_ids[MAX_DXL_COUNT];
+uint8_t dxl_count = 0; // 初期状態では0 (CONFIG受信待ち)
 const float DXL_PROTOCOL_VERSION = 2.0;
 
 /**
@@ -47,8 +48,8 @@ const uint8_t PIN_STBY = 2;
  * @name グローバル変数
  **/
 int dc_pwm[2] = {0, 0};
-int dxl_target[DXL_COUNT] = {0};
-int dxl_mode[DXL_COUNT] = {4};
+int dxl_target[MAX_DXL_COUNT] = {0};
+int dxl_mode[MAX_DXL_COUNT] = {4};
 
 // プロトタイプ
 void setupWiFi();
@@ -58,16 +59,20 @@ void handleUDP();
 void parseCommand(String& cmd);
 void setMotorPWM(uint8_t motor, int pwm);
 void sendStatus();
+void reconfigureDynamixel(String& ids_str);
 
 /**
  * @brief 初期化
  **/
 void setup() {
   Serial.begin(115200);
-  // PCとのシリアル通信はデバッグ用
 
   setupMotorPins();
-  setupDynamixel();
+
+  // DXL初期化 (ポート設定のみ、IDスキャンはCONFIG受信後)
+  dxl.begin(1000000);
+  dxl.setPortProtocolVersion(DXL_PROTOCOL_VERSION);
+
   setupWiFi();
 }
 
@@ -77,12 +82,12 @@ void setup() {
 void loop() {
   handleUDP();
 
-  // DYNAMIXEL 制御
-  for (uint8_t i = 0; i < DXL_COUNT; i++) {
+  // DYNAMIXEL 制御 (設定されている場合のみ)
+  for (uint8_t i = 0; i < dxl_count; i++) {
     if (dxl_mode[i] == 4) {
-      dxl.setGoalPosition(DXL_IDS[i], dxl_target[i]);
+      dxl.setGoalPosition(dxl_ids[i], dxl_target[i]);
     } else if (dxl_mode[i] == 1) {
-      dxl.setGoalVelocity(DXL_IDS[i], dxl_target[i]);
+      dxl.setGoalVelocity(dxl_ids[i], dxl_target[i]);
     }
   }
 
@@ -134,17 +139,37 @@ void setupMotorPins() {
 }
 
 /**
- * @brief DXL Init
+ * @brief DXL 再設定 (CONFIG受信時)
  **/
-void setupDynamixel() {
-  dxl.begin(1000000);
-  dxl.setPortProtocolVersion(DXL_PROTOCOL_VERSION);
-  for (uint8_t i = 0; i < DXL_COUNT; i++) {
-    dxl.ping(DXL_IDS[i]);
-    dxl.torqueOff(DXL_IDS[i]);
-    dxl.setOperatingMode(DXL_IDS[i], OP_EXTENDED_POSITION);
-    dxl.torqueOn(DXL_IDS[i]);
+void reconfigureDynamixel(String& ids_str) {
+  // 文字列 "1,2,3" を解析
+  dxl_count = 0;
+  int dxl_idx = 0;
+  int start = 0;
+  int comma = ids_str.indexOf(',', start);
+
+  while (comma != -1 && dxl_idx < MAX_DXL_COUNT) {
+    dxl_ids[dxl_idx++] = ids_str.substring(start, comma).toInt();
+    start = comma + 1;
+    comma = ids_str.indexOf(',', start);
   }
+  if (start < ids_str.length() && dxl_idx < MAX_DXL_COUNT) {
+    dxl_ids[dxl_idx++] = ids_str.substring(start).toInt();
+  }
+  dxl_count = dxl_idx;
+
+  // 初期設定
+  for (uint8_t i = 0; i < dxl_count; i++) {
+    dxl.ping(dxl_ids[i]);
+    dxl.torqueOff(dxl_ids[i]);
+    dxl.setOperatingMode(dxl_ids[i], OP_EXTENDED_POSITION);
+    dxl.torqueOn(dxl_ids[i]);
+    // 初期モードとターゲットをリセット
+    dxl_mode[i] = 4;
+    dxl_target[i] = dxl.getPresentPosition(dxl_ids[i]);
+  }
+  Serial.print("DXL Configured: ");
+  Serial.println(dxl_count);
 }
 
 /**
@@ -153,7 +178,6 @@ void setupDynamixel() {
 void handleUDP() {
   int packetSize = udp.parsePacket();
   if (packetSize) {
-    // パケット全体を読み込む
     char packetBuffer[255];
     int len = udp.read(packetBuffer, 255);
     if (len > 0) {
@@ -168,7 +192,8 @@ void handleUDP() {
 }
 
 /**
- * @brief コマンドパース (DC:.., DXL:..)
+ * @brief コマンドパース
+ * @details CONFIG:ids=1,2,3... を追加
  **/
 void parseCommand(String& cmd) {
   if (cmd.startsWith("DC:")) {
@@ -187,19 +212,26 @@ void parseCommand(String& cmd) {
       int mode = params.substring(c1 + 1, c2).toInt();
       int target = params.substring(c2 + 1).toInt();
 
-      for (uint8_t i = 0; i < DXL_COUNT; i++) {
-        if (DXL_IDS[i] == id) {
+      for (uint8_t i = 0; i < dxl_count; i++) {
+        if (dxl_ids[i] == id) {
           dxl_mode[i] = mode;
           dxl_target[i] = target;
           break;
         }
       }
     }
+  } else if (cmd.startsWith("CONFIG:")) {
+    // CONFIG:ids=1,2,3
+    String params = cmd.substring(7);
+    if (params.startsWith("ids=")) {
+        String ids = params.substring(4);
+        reconfigureDynamixel(ids);
+    }
   } else if (cmd == "STOP") {
     dc_pwm[0] = 0;
     dc_pwm[1] = 0;
-    for (uint8_t i = 0; i < DXL_COUNT; i++) {
-      dxl.torqueOff(DXL_IDS[i]);
+    for (uint8_t i = 0; i < dxl_count; i++) {
+      dxl.torqueOff(dxl_ids[i]);
     }
   }
 }
@@ -244,12 +276,12 @@ void sendStatus() {
   String status = "S:";
   status += String(dc_pwm[0]) + "," + String(dc_pwm[1]);
 
-  for (uint8_t i = 0; i < DXL_COUNT; i++) {
-    int pos = dxl.getPresentPosition(DXL_IDS[i]);
-    status += "," + String(DXL_IDS[i]) + ":" + String(pos);
+  for (uint8_t i = 0; i < dxl_count; i++) {
+    int pos = dxl.getPresentPosition(dxl_ids[i]);
+    status += "," + String(dxl_ids[i]) + ":" + String(pos);
   }
 
-  // ドングルへユニキャスト送信
+  // ドングルへ送信
   udp.beginPacket(DONGLE_IP, DONGLE_PORT);
   udp.print(status);
   udp.print("\n");
