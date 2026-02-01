@@ -37,6 +37,7 @@
 		(pad_to_mask_clearance 0)
 		(allow_soldermask_bridges_in_footprints no)
 		(tenting front back)
+		(aux_axis_origin 100 136)
 		(pcbplotparams
 			(layerselection 0x00000000_00000000_55555555_5755f5ff)
 			(plot_on_all_layers_selection 0x00000000_00000000_00000000_00000000)
@@ -1559,15 +1560,15 @@
 				)
 			)
 		)
-		(property "Value" "Xiao ESP32S3"
+		(property "Value" "Xiao ESP32C3"
 			(at 0 0 0)
 			(unlocked yes)
 			(layer "F.SilkS")
 			(uuid "e9ec504f-d242-4d36-af32-fed878a3dffe")
 			(effects
 				(font
-					(size 0.5 0.5)
-					(thickness 0.08)
+					(size 0.4 0.4)
+					(thickness 0.06)
 				)
 			)
 		)
@@ -10184,6 +10185,42 @@
 		)
 		(layer "Edge.Cuts")
 		(uuid "edbc2452-a531-4ea9-9b6b-0ead7f3efd5a")
+	)
+	(gr_text "2026/02/01"
+		(at 145 103 0)
+		(layer "B.SilkS")
+		(uuid "2d772bb2-ac3f-469f-8f2d-8e7090ce8d0c")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.1)
+			)
+			(justify left bottom mirror)
+		)
+	)
+	(gr_text "Ueda Toshiaki"
+		(at 145 105 0)
+		(layer "B.SilkS")
+		(uuid "6a722b03-3fc2-43cb-b3d2-d5015e160959")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.1)
+			)
+			(justify left bottom mirror)
+		)
+	)
+	(gr_text "Armlatable Main Board V1"
+		(at 145 107 0)
+		(layer "B.SilkS")
+		(uuid "f9fd8aae-9833-4cdd-938d-70a17334056f")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.1)
+			)
+			(justify left bottom mirror)
+		)
 	)
 	(segment
 		(start 121.82 128.8)
