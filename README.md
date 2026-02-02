@@ -11,55 +11,93 @@
 
 ---
 
-## プロトタイプ一覧
+# Armlatable (Locomo R4 WiFi)
 
-| ディレクトリ | マイコン | 通信 | ステータス | 説明 |
-|-------------|---------|------|-----------|------|
-| [proto_r4_wifi](./proto_r4_wifi/) | Arduino R4 WiFi | **WiFi (Dongle)** | **🟢 最新** | ESP32ドングル制御 |
-| [proto_pico](./proto_pico/) | Raspberry Pi Pico | USB Serial | 旧Ver | 初期プロトタイプ |
+Arduino R4 WiFi と ESP32 ドングルを使用したロボットアーム/台車制御システム。
 
-> [!TIP]
-> **新規開発は [proto_r4_wifi](./proto_r4_wifi/) をベースにしてください。**
+## ブランチ運用ルール
 
-## システム構成 (proto_r4_wifi)
+- **`main`**: 動作確認が完了した安定版。
+- **`develop`**: 開発版。
+
+---
+
+## システム構成
 
 ```mermaid
 graph LR
-    PC["PC"] <-->|USB| Dongle["ESP32 Dongle"]
+    PC["PC (Host App)"] <-->|USB Serial| Dongle["ESP32 Dongle"]
     Dongle <-->|WiFi UDP| R4["Arduino R4 WiFi"]
     R4 --> Motors["DYNAMIXEL & DC Motors"]
 ```
 
-詳細は [proto_r4_wifi/docs/architecture.md](./proto_r4_wifi/docs/architecture.md) を参照。
+詳細は [docs/architecture.md](./docs/architecture.md) を参照。
+
+## 必要なハードウェア
+
+1. **PC 側**:
+   - ESP32 開発ボード (M5Atom, DevKitC など) x1
+   - USB ケーブル
+
+2. **ロボット側**:
+   - Arduino R4 WiFi
+   - DYNAMIXEL Shield + XM430-W350
+   - TB6612FNG + DC Motors
+   - 12V 電源
 
 ## クイックスタート
 
-プロトタイプのディレクトリに移動し、`make` コマンドを実行するだけで、書き込みから実行まで自動的に行われます。
+### 1. 初回セットアップ
+
+ホスト側のビルド環境とArduinoコアをセットアップします。
 
 ```bash
-# 最新版 (R4 WiFi)
-cd proto_r4_wifi
-
-# 初回のみ
-make install
-# ファームウェア書き込み -> 実行 (キーボードモード)
-make
+make setup
 ```
+
+### 2. コンフィギュレーション (Optional)
+
+`config.yaml` を編集してネットワーク設定やロボットパラメータを変更できます。ビルド時に自動的に反映されます。
+
+### 3. ファームウェア書き込み
+
+**Dongle (ESP32)** と **Robot (R4 WiFi)** の両方に書き込みが必要です。
+
+```bash
+# ドングルの書き込み (PCに接続して実行)
+# ポートは Makefile の PORT_DONGLE を確認/編集
+make flash-dongle
+
+# ロボットの書き込み (PCに接続して実行)
+# ポートは Makefile の PORT_ROBOT を確認/編集
+make flash
+```
+
+### 4. 実行
+
+PCアプリ（CLI）を起動して操作します。
+
+```bash
+make run-main
+```
+
+- **W/A/S/D**: 移動
+- **X**: 停止
+- **Q**: 終了
 
 ### その他のコマンド
 
 | コマンド | 説明 |
 |---------|------|
-| `make` | ファームウェア書き込み + 実行 (`keyboard`) |
-| `make flash` | ファームウェアの書き込みのみ |
-| `make run` | 実行 (`keyboard`) のみ |
-| `make test` | 自動テストモードを実行 |
+| `make setup` | 環境構築 (CMake, Arduino Core) |
+| `make flash` | Robot (R4) への書き込み |
+| `make flash-dongle` | Dongle (ESP32) への書き込み |
+| `make flash-test` | 通信テスト用ファームウェアの書き込み (Lチカ確認用) |
+| `make run-main` | CLIコントローラのビルドと実行 |
+| `make run-viewer` | GUIビューワーのビルドと実行 |
 
-## 共通コンポーネント
+---
 
-| コンポーネント | proto_r4_wifi | proto_pico |
-|---------------|---------------|------------|
-| PC 制御 | Python | Python |
-| DYNAMIXEL | Shield (RS-485) | U2D2 (USB) |
-| DC モーター | TB6612FNG | TB6612FNG |
-| 通信 | **WiFi (Dedicated)** | USB Serial |
+## 旧プロトタイプについて
+
+[outdated](./outdated/) ディレクトリに過去のプロトタイプ (proto_pico等) が格納されています。

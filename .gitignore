@@ -1,3 +1,30 @@
+# System
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
+
+# Host Build
+host/build/
+host/bin/
+
+# Firmware Vendored Modules (Copied by Makefile)
+firmware/dongle_esp/protocol/
+firmware/dongle_esp/configuration/
+firmware/robot_r4_wifi/protocol/
+firmware/robot_r4_wifi/configuration/
+firmware/test/wifi_comm_test/protocol/
+firmware/test/wifi_comm_test/configuration/
+
+# Python
+__pycache__/
+*.pyc
+
+# Auto-generated Configuration Header
+# Optional: Uncomment if you want to force generation from config.yaml every time
+# module/src/configuration/configuration.h
+
 # Python
 venv/
 __pycache__/
