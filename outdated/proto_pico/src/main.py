@@ -23,7 +23,7 @@ class SerialConfig:
 
 @dataclass
 class DynamixelConfig:
-    id: int
+    ids: list[int]
     baud_rate: int
     model: str
     current_limit_ma: int = 500  # トルク制限 (mA)
@@ -100,18 +100,18 @@ def main():
         print(f"初期化失敗: {e}")
         return
 
-    DXL_ID = config.dynamixel.id
-    dxl.enable_torque(DXL_ID, True)
-
-    # 電流制限（トルク制限）を設定
-    dxl.set_current_limit(DXL_ID, config.dynamixel.current_limit_ma)
-    print(f"Current limit set to: {config.dynamixel.current_limit_ma} mA")
+    DXL_IDS = config.dynamixel.ids
+    for dxl_id in DXL_IDS:
+        dxl.enable_torque(dxl_id, True)
+        dxl.set_current_limit(dxl_id, config.dynamixel.current_limit_ma)
+    print(f"Torque enabled and current limit set to {config.dynamixel.current_limit_ma} mA for IDs: {DXL_IDS}")
 
     # キーボードモードの場合、現在位置に同期＆位置制限を設定
     if hasattr(controller, 'set_initial_position'):
-        current_pos = dxl.get_present_position(DXL_ID)
-        controller.set_initial_position(current_pos if current_pos else 0)
-        print(f"Synced to current position: {current_pos}")
+        # 最初のIDを基準に同期
+        current_pos = dxl.get_present_position(DXL_IDS[0])
+        controller.set_initial_position(current_pos if current_pos is not None else 0)
+        print(f"Synced to current position from ID {DXL_IDS[0]}: {current_pos}")
     if hasattr(controller, 'set_position_limits'):
         controller.set_position_limits(config.control.position_min, config.control.position_max)
         print(f"Position limits: [{config.control.position_min}, {config.control.position_max}]")
@@ -130,24 +130,26 @@ def main():
             # --- 目標値計算 (コントローラーに委譲) ---
             cmd = controller.update(elapsed)
 
-            # --- 出力 ---
-            # モード変更時のみ設定
-            if cmd.dxl_mode != last_mode:
-                dxl.set_operating_mode(DXL_ID, cmd.dxl_mode)
-                last_mode = cmd.dxl_mode
-
             # DXL制御
-            if cmd.dxl_mode == 3 or cmd.dxl_mode == 4:  # Position / Extended Position
-                dxl.set_position(DXL_ID, cmd.dxl_target)
-            elif cmd.dxl_mode == 1:  # Velocity
-                dxl.set_velocity(DXL_ID, cmd.dxl_target)
+            for dxl_id in DXL_IDS:
+                # モード変更時のみ設定
+                if cmd.dxl_mode != last_mode:
+                    dxl.set_operating_mode(dxl_id, cmd.dxl_mode)
+
+                if cmd.dxl_mode == 3 or cmd.dxl_mode == 4:  # Position / Extended Position
+                    dxl.set_position(dxl_id, cmd.dxl_target)
+                elif cmd.dxl_mode == 1:  # Velocity
+                    dxl.set_velocity(dxl_id, cmd.dxl_target)
+
+            if cmd.dxl_mode != last_mode:
+                last_mode = cmd.dxl_mode
 
             # Pico出力
             pico.set_motor_pwm(cmd.dc_pwm)
 
             # Log
             mode_str = 'ExtPos' if cmd.dxl_mode == 4 else ('Pos' if cmd.dxl_mode == 3 else 'Vel')
-            print(f"\rTime: {elapsed:.2f} | DC: {cmd.dc_pwm:4d} | DXL({mode_str}): {cmd.dxl_target:5d}", end='')
+            print(f"\rTime: {elapsed:.2f} | DC: {cmd.dc_pwm:4d} | DXLs({mode_str}): {cmd.dxl_target:5d}", end='')
             sys.stdout.flush()
 
             time.sleep(1.0 / config.control.loop_rate_hz)
@@ -157,7 +159,8 @@ def main():
 
     finally:
         pico.set_motor_pwm(0)
-        dxl.enable_torque(DXL_ID, False)
+        for dxl_id in DXL_IDS:
+            dxl.enable_torque(dxl_id, False)
         dxl.close()
         pico.close()
         if hasattr(controller, 'cleanup'):
