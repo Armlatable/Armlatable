@@ -5,8 +5,16 @@ import threading
 class DCMotorInterface:
     def __init__(self, port, baudrate=115200):
         self.ser = serial.Serial(port, baudrate, timeout=0.1)
+        # WSL/Linuxでの安定性のためにDTR/RTSを制御
+        self.ser.dtr = True
+        self.ser.rts = True
+
         self.lock = threading.Lock()
-        time.sleep(2) # Picoのリセット待ち
+        time.sleep(2) # Arduino/Picoのリセット待ち
+
+        # 初期バッファをクリア
+        self.ser.reset_input_buffer()
+        self.ser.reset_output_buffer()
 
         self.latest_pwm = 0
 
@@ -15,6 +23,7 @@ class DCMotorInterface:
         cmd = f"M:{int(pwm)}\n"
         with self.lock:
             self.ser.write(cmd.encode())
+            self.ser.flush() # WSLでのバッファリング問題を回避するために即座に送信
 
     def set_enabled(self, enabled: bool):
         """モーターの有効/無効 (STBY) を切り替える"""
@@ -22,6 +31,7 @@ class DCMotorInterface:
         cmd = f"E:{val}\n"
         with self.lock:
             self.ser.write(cmd.encode())
+            self.ser.flush()
 
     def update(self):
         """Picoからステータスを読み取る"""
