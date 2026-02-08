@@ -1,11 +1,22 @@
-# 検出されたポート設定
-DXL_PORT ?= /dev/tty.usbserial-FTAO9VZP
-PICO_PORT ?= /dev/tty.usbmodem11401
+# OS Detection
+UNAME_S := $(shell uname -s)
 
-# Virtual Environment Settings
+# Default Port Settings (macOS vs Linux/WSL)
+ifeq ($(UNAME_S),Darwin)
+    # macOS
+    DXL_PORT ?= /dev/tty.usbserial-FTAO9VZP
+    PICO_PORT ?= /dev/tty.usbmodemF412FA77615C2
+else
+    # Linux / WSL
+    DXL_PORT ?= /dev/ttyUSB0
+    PICO_PORT ?= /dev/ttyACM0
+endif
+
+# Python Settings
+PYTHON_CMD ?= python3
 VENV_DIR = venv
 PYTHON = $(VENV_DIR)/bin/python
-PIP = $(VENV_DIR)/bin/pip
+PIP = $(PYTHON) -m pip
 
 .PHONY: all run install flash clean help setup_venv
 
@@ -21,7 +32,11 @@ help:
 
 # venv作成
 setup_venv:
-	python3 -m venv $(VENV_DIR)
+	@if ! command -v $(PYTHON_CMD) > /dev/null; then \
+		echo "Error: $(PYTHON_CMD) が見つかりません。Pythonをインストールしてください。"; \
+		exit 1; \
+	fi
+	$(PYTHON_CMD) -m venv $(VENV_DIR)
 
 # 依存ライブラリインストール
 install: setup_venv
