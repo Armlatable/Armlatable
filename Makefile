@@ -18,7 +18,7 @@ VENV_DIR = venv
 PYTHON = $(VENV_DIR)/bin/python
 PIP = $(PYTHON) -m pip
 
-.PHONY: all run install flash clean help setup_venv
+.PHONY: all run install flash clean help setup_venv setup
 
 # デフォルトターゲット
 all: help
@@ -28,6 +28,7 @@ help:
 	@echo "使用可能なコマンド:"
 	@echo "  make run      : メイン制御プログラムを実行します (venvを使用)"
 	@echo "  make install  : venvを作成しライブラリをインストールします"
+	@echo "  make setup    : シリアルポートを自動検出し config.yaml を更新します"
 	@echo "  make clean    : 一時ファイルとvenvを削除します"
 
 # venv作成
@@ -42,6 +43,12 @@ setup_venv:
 install: setup_venv
 	$(PIP) install --upgrade pip
 	$(PIP) install -r requirements.txt
+	@echo "インストール完了。次に 'make setup' を実行してポートを設定してください。"
+
+# ポート自動検出
+setup:
+	@if [ ! -d "$(VENV_DIR)" ]; then echo "venvが見つかりません。'make install'を先に実行してください。"; exit 1; fi
+	$(PYTHON) scripts/setup_ports.py
 
 # テスト実行 (自動制御)
 test:

@@ -17,58 +17,41 @@
 
 ## 2. ソフトウェア準備
 
-ターミナルで本ディレクトリ (`Armlatable`) に移動し、以下のコマンドを実行する。
+ターミナルで本ディレクトリ (`Armlatable`) に移動し、以下の手順でセットアップを行います。
 
-### ライブラリのインストール
-Pythonの依存ライブラリをインストールする（仮想環境 `venv` が作成される）。
+### 2.1 依存ライブラリのインストール
+Pythonの依存ライブラリをインストールします（仮想環境 `venv` が作成されます）。
 ```bash
 make install
 ```
 
-### ファームウェアの書き込み (初回のみ)
-Raspberry Pi Pico にファームウェアを書き込む。
-Arduino IDEを使用するか、CLIがセットアップされている場合は以下を実行する。
+### 2.2 ポートの自動検出と設定
+デバイス（U2D2, R4/Pico）をPCに接続した状態で、以下のコマンドを実行します。
 ```bash
-make flash
-# または Arduino IDE で firmware/pico_motor_driver/pico_motor_driver.ino を書き込む
+make setup
+```
+これにより、シリアルポートが自動検出され、ルートディレクトリの `config.yaml` が更新されます。
+
+### 2.3 ファームウェアの書き込み (必要な場合のみ)
+Arduino R4 WiFi または Raspberry Pi Pico にファームウェアを書き込みます。
+```bash
+# R4 WiFi の場合
+arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi firmware/r4_motor_driver/r4_motor_driver.ino
+arduino-cli upload -p <PORT> --fqbn arduino:renesas_uno:unor4wifi firmware/r4_motor_driver/r4_motor_driver.ino
 ```
 
-## 3. 設定確認
+## 3. 設定の確認
 
-`config.yaml` を開き、接続されているシリアルポートが正しいか確認・修正する。
+ルートディレクトリの `config.yaml` で、ハードウェア構成に合わせて設定を調整できます。
 
 ```yaml
 serial:
-  dxl_port: "/dev/tty.usbserial-XXXXXX" # U2D2のポート
-  pico_port: "/dev/tty.usbmodemXXXXXX"  # Picoのポート
-```
-
-ポート名の確認方法 (Mac):
-```bash
-ls /dev/tty.usb* /dev/tty.usbmodem*
+  motor_driver_type: "r4" # "r4" または "pico"
 ```
 
 ## 4. 実行
 
-### 4.1 デモ実行 (自動制御)
-
-以下のコマンドでテスト用の自動制御プログラムを開始する。
-
-```bash
-make test
-```
-
-#### 動作内容
-- **0〜5秒**:
-    - DCモーター: PWM制御で徐々に加速・減速 (-255 〜 255)
-    - Dynamixel: 位置制御 (Position Mode) で往復運動
-- **5〜10秒**:
-    - DCモーター: 停止
-    - Dynamixel: 速度制御 (Velocity Mode) で一定回転 (100 RPM)
-
-### 4.2 キーボード操作
-
-以下のコマンドでキーボード操作モードを開始する。
+### 4.1 キーボード操作モード (推奨)
 
 ```bash
 make keyboard
@@ -77,15 +60,24 @@ make keyboard
 #### 操作方法
 | キー | 動作 |
 |------|------|
+| `0` | **すべてのDynamixelを選択** |
+| `1`, `2`, `3` | 個別のDynamixel IDを選択 |
+| `a` / `d` | 選択中のDynamixelを増減 |
 | `w` / `s` | DCモーター PWM +/- 50 |
 | `x` | DCモーター 停止 |
-| `a` / `d` | Dynamixel Position/Velocity +/- 100 |
-| `m` | モード切替 (Position ↔ Velocity) |
+| `e` / `r` | モーターの有効化 / 無効化 (Torque/STBY) |
+| `m` | Dynamixelモード切替 (Position ↔ Velocity) |
 | `Space` | 全停止 |
 | `q` | 終了 |
+
+### 4.2 自動テストモード
+
+```bash
+make test
+```
 
 ## 5. その他
 
 - **トラブルシューティング**
-    - **Error: Resource busy**: Arduino IDEのシリアルモニタ等を閉じること。
-    - **Permission denied**: USBデバイスのアクセス権限を確認すること。
+    - **ポートが検出されない**: `make setup` で検出されない場合は、`config.yaml` を手動で編集してください。
+    - **Resource busy**: 他のシリアルモニタを閉じてください。
