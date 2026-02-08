@@ -9,6 +9,7 @@ class ControlCommand:
     dc_pwm: int         # DCモーターPWM (-255 ~ 255)
     dxl_mode: int       # Dynamixelモード (1: Velocity, 3: Position)
     dxl_targets: dict[int, int] # IDごとの目標値
+    enable: bool | None = None
 
 
 class TestController:

@@ -13,6 +13,7 @@ class ControlCommand:
     dc_pwm: int         # DCモーターPWM (-255 ~ 255)
     dxl_mode: int       # Dynamixelモード (1: Velocity, 4: Extended Position)
     dxl_targets: dict[int, int] # IDごとの目標値
+    enable: bool | None = None # 有効/無効切り替え (Torque, STBY)
 
 
 class KeyboardController:
@@ -47,11 +48,13 @@ class KeyboardController:
 
     def _print_help(self):
         print("\n=== Keyboard Control ===")
-        print(" [1, 2, 3] Select Dynamixel ID")
+        print(" [0]       Select ALL Dynamixels")
+        print(" [1, 2, 3] Select individual Dynamixel ID")
         print(" [w/s] DC Motor +/- 50 PWM")
         print(" [x]   DC Motor Stop")
         print(" [a/d] Selected DXL +/- 500 (Pos) / +/- 20 (Vel)")
         print(" [m]   Toggle Mode (Pos/Vel) for ALL")
+        print(" [e/r] Enable / Disable Motors")
         print(" [Space] Stop All")
         print(" [q]   Quit")
         print("========================\n")
@@ -89,6 +92,9 @@ class KeyboardController:
         if key:
             if key == 'q':
                 self._running = False
+            elif key == '0':
+                self.selected_id = 0
+                print("\nSelected: ALL Dynamixels")
             elif key in [str(i) for i in self.dxl_ids]:
                 self.selected_id = int(key)
                 print(f"\nSelected Dynamixel ID: {self.selected_id}")
@@ -99,15 +105,19 @@ class KeyboardController:
             elif key == 'x':
                 self.dc_pwm = 0
             elif key == 'a':
-                if self.dxl_mode == 4:
-                    self.dxl_target_pos[self.selected_id] += 500
-                else:
-                    self.dxl_target_vel[self.selected_id] += 20
+                ids_to_move = self.dxl_ids if self.selected_id == 0 else [self.selected_id]
+                for dxl_id in ids_to_move:
+                    if self.dxl_mode == 4:
+                        self.dxl_target_pos[dxl_id] += 500
+                    else:
+                        self.dxl_target_vel[dxl_id] += 20
             elif key == 'd':
-                if self.dxl_mode == 4:
-                    self.dxl_target_pos[self.selected_id] -= 500
-                else:
-                    self.dxl_target_vel[self.selected_id] -= 20
+                ids_to_move = self.dxl_ids if self.selected_id == 0 else [self.selected_id]
+                for dxl_id in ids_to_move:
+                    if self.dxl_mode == 4:
+                        self.dxl_target_pos[dxl_id] -= 500
+                    else:
+                        self.dxl_target_vel[dxl_id] -= 20
             elif key == 'm':
                 if self.dxl_mode == 4:
                     self.dxl_mode = 1
@@ -117,6 +127,10 @@ class KeyboardController:
                 else:
                     self.dxl_mode = 4
                     print("\nMode: Position (Extended)")
+            elif key == 'e':
+                return ControlCommand(dc_pwm=self.dc_pwm, dxl_mode=self.dxl_mode, dxl_targets=self.dxl_target_pos.copy() if self.dxl_mode == 4 else self.dxl_target_vel.copy(), enable=True)
+            elif key == 'r':
+                return ControlCommand(dc_pwm=self.dc_pwm, dxl_mode=self.dxl_mode, dxl_targets=self.dxl_target_pos.copy() if self.dxl_mode == 4 else self.dxl_target_vel.copy(), enable=False)
             elif key == ' ':
                 self.dc_pwm = 0
                 for dxl_id in self.dxl_ids:

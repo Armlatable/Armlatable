@@ -2,7 +2,7 @@ import serial
 import time
 import threading
 
-class PicoInterface:
+class DCMotorInterface:
     def __init__(self, port, baudrate=115200):
         self.ser = serial.Serial(port, baudrate, timeout=0.1)
         self.lock = threading.Lock()
@@ -11,8 +11,15 @@ class PicoInterface:
         self.latest_pwm = 0
 
     def set_motor_pwm(self, pwm):
-        """PicoへモーターPWM指令を送信する (-255 から 255)"""
+        """モーターPWM指令を送信する (-255 から 255)"""
         cmd = f"M:{int(pwm)}\n"
+        with self.lock:
+            self.ser.write(cmd.encode())
+
+    def set_enabled(self, enabled: bool):
+        """モーターの有効/無効 (STBY) を切り替える"""
+        val = 1 if enabled else 0
+        cmd = f"E:{val}\n"
         with self.lock:
             self.ser.write(cmd.encode())
 

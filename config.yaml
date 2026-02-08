@@ -1,6 +1,7 @@
 serial:
   dxl_port: "/dev/tty.usbserial-FTAO9VZP"
   pico_port: "/dev/tty.usbmodemF412FA77615C2"
+  motor_driver_type: "r4"  # "pico" or "r4"
 
 dynamixel:
   ids: [1, 2, 3]

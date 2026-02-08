@@ -14,13 +14,14 @@ import sys
 import os
 from dataclasses import dataclass
 from hardware.dxl_interface import DynamixelInterface
-from hardware.pico_interface import PicoInterface
+from hardware.dc_motor_interface import DCMotorInterface
 
 # --- 設定クラス ---
 @dataclass
 class SerialConfig:
     dxl_port: str
     pico_port: str
+    motor_driver_type: str = "pico" # "pico" or "r4"
 
 @dataclass
 class DynamixelConfig:
@@ -102,11 +103,11 @@ def main():
         print(f"Failed to load controller: {e}")
         return
 
-    # --- ハードウェア初期化 ---
-    print("Initializing Hardware...")
+    print(f"Initializing Hardware (Motor Driver: {config.serial.motor_driver_type})...")
     try:
         dxl = DynamixelInterface(config.serial.dxl_port, baud_rate=config.dynamixel.baud_rate)
-        pico = PicoInterface(config.serial.pico_port)
+        # 内部的には同じプロトコルを使用しているため、DCMotorInterfaceを共通で使用
+        dc_motor = DCMotorInterface(config.serial.pico_port)
     except Exception as e:
         print(f"初期化失敗: {e}")
         return
@@ -140,7 +141,7 @@ def main():
             elapsed = time.time() - start_time
 
             # --- ステータス読み取り ---
-            pico.update()
+            dc_motor.update()
 
             # --- 目標値計算 (コントローラーに委譲) ---
             cmd = controller.update(elapsed)
@@ -159,13 +160,21 @@ def main():
             if cmd.dxl_mode != last_mode:
                 last_mode = cmd.dxl_mode
 
-            # Pico出力
-            pico.set_motor_pwm(cmd.dc_pwm)
+            # Enable/Disable 制御
+            if cmd.enable is not None:
+                print(f"\nSetting Motors: {'ENABLED' if cmd.enable else 'DISABLED'}")
+                for dxl_id in DXL_IDS:
+                    dxl.enable_torque(dxl_id, cmd.enable)
+                dc_motor.set_enabled(cmd.enable)
+
+            # DCモーター出力
+            dc_motor.set_motor_pwm(cmd.dc_pwm)
 
             # Log
             mode_str = 'ExtPos' if cmd.dxl_mode == 4 else ('Pos' if cmd.dxl_mode == 3 else 'Vel')
             target_str = ", ".join([f"{id}:{val}" for id, val in cmd.dxl_targets.items()])
-            print(f"\rTime: {elapsed:.2f} | DC: {cmd.dc_pwm:4d} | DXLs({mode_str}): {target_str}", end='')
+            driver_label = config.serial.motor_driver_type.upper()
+            print(f"\rTime: {elapsed:.2f} | {driver_label}: {cmd.dc_pwm:4d} | DXLs({mode_str}): {target_str}", end='')
             sys.stdout.flush()
 
             time.sleep(1.0 / config.control.loop_rate_hz)
@@ -174,11 +183,11 @@ def main():
         print("\n停止中...")
 
     finally:
-        pico.set_motor_pwm(0)
+        dc_motor.set_motor_pwm(0)
         for dxl_id in DXL_IDS:
             dxl.enable_torque(dxl_id, False)
         dxl.close()
-        pico.close()
+        dc_motor.close()
         if hasattr(controller, 'cleanup'):
             controller.cleanup()
         print("\nハードウェア接続を終了しました。")
