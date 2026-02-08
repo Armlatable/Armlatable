@@ -11,8 +11,8 @@ from dataclasses import dataclass
 class ControlCommand:
     """制御コマンド"""
     dc_pwm: int         # DCモーターPWM (-255 ~ 255)
-    dxl_mode: int       # Dynamixelモード (1: Velocity, 3: Position)
-    dxl_target: int     # Dynamixel目標値 (Position: 0-4095, Velocity: rpm)
+    dxl_mode: int       # Dynamixelモード (1: Velocity, 4: Extended Position)
+    dxl_targets: dict[int, int] # IDごとの目標値
 
 
 class KeyboardController:
@@ -27,11 +27,13 @@ class KeyboardController:
         Space: 全停止
         q:   終了
     """
-    def __init__(self):
+    def __init__(self, dxl_ids: list[int]):
+        self.dxl_ids = dxl_ids
+        self.selected_id = dxl_ids[0] if dxl_ids else 1
         self.dc_pwm = 0
         self.dxl_mode = 4  # Extended Position Control (multi-turn)
-        self.dxl_target_pos = 0  # Will be synced to actual position
-        self.dxl_target_vel = 0
+        self.dxl_target_pos = {id: 0 for id in dxl_ids}
+        self.dxl_target_vel = {id: 0 for id in dxl_ids}
         self._running = True
         self._initialized = False
         self.pos_min = -20000  # Default limits
@@ -45,17 +47,20 @@ class KeyboardController:
 
     def _print_help(self):
         print("\n=== Keyboard Control ===")
+        print(" [1, 2, 3] Select Dynamixel ID")
         print(" [w/s] DC Motor +/- 50 PWM")
         print(" [x]   DC Motor Stop")
-        print(" [a/d] Dynamixel +/- 500 (Pos) / +/- 20 (Vel)")
-        print(" [m]   Toggle Mode (Pos/Vel)")
+        print(" [a/d] Selected DXL +/- 500 (Pos) / +/- 20 (Vel)")
+        print(" [m]   Toggle Mode (Pos/Vel) for ALL")
         print(" [Space] Stop All")
         print(" [q]   Quit")
         print("========================\n")
 
-    def set_initial_position(self, pos: int):
+    def set_initial_position(self, pos_dict: dict[int, int]):
         """初期位置を設定（現在のDynamixel位置に同期）"""
-        self.dxl_target_pos = pos
+        for dxl_id, pos in pos_dict.items():
+            if dxl_id in self.dxl_target_pos:
+                self.dxl_target_pos[dxl_id] = pos
         self._initialized = True
 
     def set_position_limits(self, pos_min: int, pos_max: int):
@@ -84,6 +89,9 @@ class KeyboardController:
         if key:
             if key == 'q':
                 self._running = False
+            elif key in [str(i) for i in self.dxl_ids]:
+                self.selected_id = int(key)
+                print(f"\nSelected Dynamixel ID: {self.selected_id}")
             elif key == 'w':
                 self.dc_pwm = min(255, self.dc_pwm + 50)
             elif key == 's':
@@ -92,28 +100,30 @@ class KeyboardController:
                 self.dc_pwm = 0
             elif key == 'a':
                 if self.dxl_mode == 4:
-                    self.dxl_target_pos += 500
+                    self.dxl_target_pos[self.selected_id] += 500
                 else:
-                    self.dxl_target_vel += 20
+                    self.dxl_target_vel[self.selected_id] += 20
             elif key == 'd':
                 if self.dxl_mode == 4:
-                    self.dxl_target_pos -= 500
+                    self.dxl_target_pos[self.selected_id] -= 500
                 else:
-                    self.dxl_target_vel -= 20
+                    self.dxl_target_vel[self.selected_id] -= 20
             elif key == 'm':
                 if self.dxl_mode == 4:
                     self.dxl_mode = 1
-                    self.dxl_target_vel = 0
+                    for dxl_id in self.dxl_ids:
+                        self.dxl_target_vel[dxl_id] = 0
                     print("\nMode: Velocity")
                 else:
                     self.dxl_mode = 4
                     print("\nMode: Position (Extended)")
             elif key == ' ':
                 self.dc_pwm = 0
-                self.dxl_target_vel = 0
+                for dxl_id in self.dxl_ids:
+                    self.dxl_target_vel[dxl_id] = 0
 
-        target = self.dxl_target_pos if self.dxl_mode == 4 else self.dxl_target_vel
-        return ControlCommand(dc_pwm=self.dc_pwm, dxl_mode=self.dxl_mode, dxl_target=target)
+        targets = self.dxl_target_pos if self.dxl_mode == 4 else self.dxl_target_vel
+        return ControlCommand(dc_pwm=self.dc_pwm, dxl_mode=self.dxl_mode, dxl_targets=targets.copy())
 
     def should_continue(self) -> bool:
         """継続するかどうか"""

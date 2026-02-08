@@ -11,6 +11,7 @@ Armlatable メインコントロールプログラム
 import yaml
 import time
 import sys
+import os
 from dataclasses import dataclass
 from hardware.dxl_interface import DynamixelInterface
 from hardware.pico_interface import PicoInterface
@@ -23,7 +24,7 @@ class SerialConfig:
 
 @dataclass
 class DynamixelConfig:
-    id: int
+    ids: list[int]
     baud_rate: int
     model: str
     current_limit_ma: int = 500  # トルク制限 (mA)
@@ -51,22 +52,23 @@ class AppConfig:
         )
 
 # --- コントローラー読み込み ---
-def get_controller(name: str):
+def get_controller(name: str, dxl_ids: list[int]):
     """
     指定された名前のコントローラーを取得する
 
     Args:
         name: コントローラー名 ('test' or 'keyboard')
+        dxl_ids: Dynamixel IDのリスト
 
     Returns:
         Controller instance
     """
     if name == 'test':
         from api.test import TestController
-        return TestController()
+        return TestController(dxl_ids)
     elif name == 'keyboard':
         from api.keyboard import KeyboardController
-        return KeyboardController()
+        return KeyboardController(dxl_ids)
     else:
         raise ValueError(f"Unknown controller: {name}")
 
@@ -76,16 +78,25 @@ def main():
     controller_name = sys.argv[1] if len(sys.argv) > 1 else 'test'
 
     # --- 設定読み込み ---
-    try:
-        config = AppConfig.load('src/config.yaml')
-        print(f"Loaded config: {config}")
-    except Exception as e:
-        print(f"Failed to load config: {e}")
+    config_paths = ['config.yaml', 'src/config.yaml']
+    config = None
+    for path in config_paths:
+        try:
+            if os.path.exists(path):
+                config = AppConfig.load(path)
+                print(f"Loaded config from: {path}")
+                break
+        except Exception as e:
+            print(f"Warning: Failed to load config from {path}: {e}")
+
+    if config is None:
+        print("Error: config.yaml not found in root or src/")
         return
 
     # --- コントローラー初期化 ---
+    DXL_IDS = config.dynamixel.ids
     try:
-        controller = get_controller(controller_name)
+        controller = get_controller(controller_name, DXL_IDS)
         print(f"Controller: {controller_name}")
     except Exception as e:
         print(f"Failed to load controller: {e}")
@@ -100,18 +111,22 @@ def main():
         print(f"初期化失敗: {e}")
         return
 
-    DXL_ID = config.dynamixel.id
-    dxl.enable_torque(DXL_ID, True)
-
-    # 電流制限（トルク制限）を設定
-    dxl.set_current_limit(DXL_ID, config.dynamixel.current_limit_ma)
-    print(f"Current limit set to: {config.dynamixel.current_limit_ma} mA")
+    DXL_IDS = config.dynamixel.ids
+    for dxl_id in DXL_IDS:
+        dxl.enable_torque(dxl_id, True)
+        dxl.set_current_limit(dxl_id, config.dynamixel.current_limit_ma)
+    print(f"Torque enabled and current limit set to {config.dynamixel.current_limit_ma} mA for IDs: {DXL_IDS}")
 
     # キーボードモードの場合、現在位置に同期＆位置制限を設定
     if hasattr(controller, 'set_initial_position'):
-        current_pos = dxl.get_present_position(DXL_ID)
-        controller.set_initial_position(current_pos if current_pos else 0)
-        print(f"Synced to current position: {current_pos}")
+        # すべてのIDの現在位置を取得して同期
+        initial_positions = {}
+        for dxl_id in DXL_IDS:
+            current_pos = dxl.get_present_position(dxl_id)
+            initial_positions[dxl_id] = current_pos if current_pos is not None else 0
+
+        controller.set_initial_position(initial_positions)
+        print(f"Synced to current positions: {initial_positions}")
     if hasattr(controller, 'set_position_limits'):
         controller.set_position_limits(config.control.position_min, config.control.position_max)
         print(f"Position limits: [{config.control.position_min}, {config.control.position_max}]")
@@ -130,24 +145,27 @@ def main():
             # --- 目標値計算 (コントローラーに委譲) ---
             cmd = controller.update(elapsed)
 
-            # --- 出力 ---
-            # モード変更時のみ設定
-            if cmd.dxl_mode != last_mode:
-                dxl.set_operating_mode(DXL_ID, cmd.dxl_mode)
-                last_mode = cmd.dxl_mode
-
             # DXL制御
-            if cmd.dxl_mode == 3 or cmd.dxl_mode == 4:  # Position / Extended Position
-                dxl.set_position(DXL_ID, cmd.dxl_target)
-            elif cmd.dxl_mode == 1:  # Velocity
-                dxl.set_velocity(DXL_ID, cmd.dxl_target)
+            for dxl_id, dxl_target in cmd.dxl_targets.items():
+                # モード変更時のみ設定
+                if cmd.dxl_mode != last_mode:
+                    dxl.set_operating_mode(dxl_id, cmd.dxl_mode)
+
+                if cmd.dxl_mode == 3 or cmd.dxl_mode == 4:  # Position / Extended Position
+                    dxl.set_position(dxl_id, dxl_target)
+                elif cmd.dxl_mode == 1:  # Velocity
+                    dxl.set_velocity(dxl_id, dxl_target)
+
+            if cmd.dxl_mode != last_mode:
+                last_mode = cmd.dxl_mode
 
             # Pico出力
             pico.set_motor_pwm(cmd.dc_pwm)
 
             # Log
             mode_str = 'ExtPos' if cmd.dxl_mode == 4 else ('Pos' if cmd.dxl_mode == 3 else 'Vel')
-            print(f"\rTime: {elapsed:.2f} | DC: {cmd.dc_pwm:4d} | DXL({mode_str}): {cmd.dxl_target:5d}", end='')
+            target_str = ", ".join([f"{id}:{val}" for id, val in cmd.dxl_targets.items()])
+            print(f"\rTime: {elapsed:.2f} | DC: {cmd.dc_pwm:4d} | DXLs({mode_str}): {target_str}", end='')
             sys.stdout.flush()
 
             time.sleep(1.0 / config.control.loop_rate_hz)
@@ -157,7 +175,8 @@ def main():
 
     finally:
         pico.set_motor_pwm(0)
-        dxl.enable_torque(DXL_ID, False)
+        for dxl_id in DXL_IDS:
+            dxl.enable_torque(dxl_id, False)
         dxl.close()
         pico.close()
         if hasattr(controller, 'cleanup'):

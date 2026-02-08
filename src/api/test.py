@@ -8,14 +8,15 @@ class ControlCommand:
     """制御コマンド"""
     dc_pwm: int         # DCモーターPWM (-255 ~ 255)
     dxl_mode: int       # Dynamixelモード (1: Velocity, 3: Position)
-    dxl_target: int     # Dynamixel目標値 (Position: 0-4095, Velocity: rpm)
+    dxl_targets: dict[int, int] # IDごとの目標値
 
 
 class TestController:
     """
     時間経過に基づいて目標値を計算するテスト用コントローラー
     """
-    def __init__(self):
+    def __init__(self, dxl_ids: list[int]):
+        self.dxl_ids = dxl_ids
         self.period = 10.0  # 周期 (秒)
 
     def update(self, elapsed: float) -> ControlCommand:
@@ -41,7 +42,8 @@ class TestController:
             dxl_mode = 1  # Velocity Mode
             dxl_target = 100  # 100rpm
 
-        return ControlCommand(dc_pwm=dc_pwm, dxl_mode=dxl_mode, dxl_target=dxl_target)
+        targets = {id: dxl_target for id in self.dxl_ids}
+        return ControlCommand(dc_pwm=dc_pwm, dxl_mode=dxl_mode, dxl_targets=targets)
 
     def should_continue(self) -> bool:
         """継続するかどうか (常にTrue)"""

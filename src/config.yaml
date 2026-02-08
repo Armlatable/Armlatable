@@ -1,9 +1,9 @@
 serial:
   dxl_port: "/dev/tty.usbserial-FTAO9VZP"
-  pico_port: "/dev/tty.usbmodem14201"
+  pico_port: "/dev/tty.usbmodemF412FA77615C2"
 
 dynamixel:
-  id: 1
+  ids: [1, 2, 3]
   baud_rate: 57600
   model: "XM430"
   current_limit_ma: 500  # トルク制限 (mA)
