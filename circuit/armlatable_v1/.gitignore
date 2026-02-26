@@ -12,9 +12,9 @@ fp-info-cache
 # Lock files
 *.lck
 
-# Garbar files
-garbar.zip
-garbar/
+# Gerber files
+gerber.zip
+gerber/
 
 # Temporary files
 #auto_saved_files#
