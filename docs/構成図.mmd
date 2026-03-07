@@ -1,0 +1,32 @@
+graph LR
+    %% ノード定義
+    PC[PC]
+
+    %% Dynamixel系統 (直列)
+    U2D2(U2D2)
+    subgraph DX_Group [ ]
+        direction TB
+        DX1["Dynamixel"]
+        DX2["Dynamixel"]
+        DX1 --- DX2
+    end
+    style DX_Group fill:none,stroke:none
+
+    %% DCモータ系統 (並列)
+    MD[Motor Driver]
+    DM1["Diaphragm Pump"]
+    DM2["Diaphragm Pump"]
+
+    %% 接続: 左から右へ
+    PC --- U2D2
+    U2D2 --- DX1
+    PC --- MD
+    MD --- DM1
+    MD --- DM2
+
+    %% スタイリング（見やすさのため色分けのみ継続）
+    style PC fill:#e1f5fe,stroke:#01579b
+    style DX1 fill:#fff3e0,stroke:#e65100
+    style DX2 fill:#fff3e0,stroke:#e65100
+    style DM1 fill:#f1f8e9,stroke:#33691e
+    style DM2 fill:#f1f8e9,stroke:#33691e
